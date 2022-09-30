@@ -1,0 +1,25 @@
+{
+  "name": "@northroad-craftworks/accounts",
+  "private": true,
+  "version": "0.0.0-unreleased.0",
+  "description": "User authentication and authorization",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node .",
+    "test": "c8 mocha --exit",
+    "redis": "docker run --name redis -p 6379:6379 --rm -d redis"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Northroad-Craftworks/accounts.git"
+  },
+  "contributors": [
+    "James Tanner <james@northroad-craftworks.com>"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+  },
+  "devDependencies": {
+  }
+}
