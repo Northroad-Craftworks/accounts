@@ -1,6 +1,6 @@
 export async function whoami(req, res, next) {
     const accepts = req.accepts(['json', 'html']);
-    const { user, session, accessToken } = req;
+    const { user, accessToken } = req;
     if (accepts === 'html') {
         res.type(accepts);
         if (!user) res.send(`<h1>Not logged in</h1>`);
@@ -11,5 +11,5 @@ export async function whoami(req, res, next) {
             res.send(`${name}\n${email}\n${photo}`);
         }
     }
-    else res.json({ user, session, accessToken });
+    else res.json({ user, accessToken });
 }
