@@ -35,10 +35,18 @@ if (GOOGLE_CLIENT_ID) {
         clientID: GOOGLE_CLIENT_ID,
         clientSecret: GOOGLE_CLIENT_SECRET,
         callbackURL: '/oauth2/redirect/google',
-        scope: ['email', 'profile']
+        scope: ['email', 'profile'],
+        store: true
     };
     passport.use(new GoogleStrategy(googleOptions, verifyOauthProfile));
-    router.get('/login/google', passport.authenticate('google'));
+    router.get('/login/google',
+        (req, res, next) => {
+            const state = {
+                trace: req.traceId,
+                destination: req.query.destination
+            };
+            passport.authenticate('google', { state })(req, res, next);
+        });
     router.get('/oauth2/redirect/google',
         passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }),
         redirectToDestination);
@@ -60,38 +68,47 @@ if (strategies.length) logger.verbose(`Configured authentication strategies: ${s
 else logger.warn('No authentication strategies are configured!');
 
 
+router.get('/login/:strategy', req => {
+    throw createError(404, `No ${req.params.strategy} authentication strategy is configured.`);
+});
+
 // Attach the login and logout handlers.
 router.get('/login', (req, res) => {
-    const fromLogout = req.query?.source === 'logout';
-    const allowAutoLogin = !fromLogout && req.query?.allowAuto !== false;
-    if (allowAutoLogin && strategies.length === 1) {
-        res.redirect(`/login/${strategies[0].toLowerCase()}`);
+    if (!req.session?.messages && strategies.length === 1) {
+        res.redirect(`/login/${strategies[0].toLowerCase()}?trace=${req.traceId}`);
     }
     else if (strategies.length) {
         // TODO Replace placeholder login page with a proper one.
-        const links = strategies.map(strategy => `<li><a href='/login/${strategy}'>${strategy}</a></li>`);
-        res.type('html').send(`<h1>Login</h2>\n<ul>\n${links.join('\n')}\n</ul>`);
+        const messages = (req.session?.messages || [])
+            .map(message => `<p>${message}</p>`)
+            .join('\n');
+        delete req.session?.messages
+        
+        const links = strategies
+            .map(strategy => `<li><a href='/login/${strategy}'>${strategy}</a></li>`)
+            .join('\n');
+        res.type('html').send(`<h1>Login</h2>\n${messages}\n<ul>\n${links}\n</ul>`);
     }
     else throw createError(503, "No authentication strategies are available", { expose: true, stack: false });
 });
 
 router.use('/logout',
-    (req, res, next) => req.logout(next),
-    (req, res) => res.redirect('/login?source=logout'));
-
-
-// If the user isn't authenticated, send them to login.
-router.get('/', (req, res, next) => {
-    if (!req.user) res.redirect('/login');
-    else next();
-});
+    (req, res, next) => {
+        req.initialUser = req.user;
+        req.logout(next);
+    },
+    (req, res) => res.redirect(`/?trace=${req.traceId}`));
 
 /**
  * Helper function to redirect to the user's destination after login.
  */
 function redirectToDestination(req, res) {
     // TODO Load the intended destination.
-    res.redirect('/');
+    const { authInfo, query } = req;
+    if (authInfo?.state?.trace) req.setTraceId(authInfo.state.trace);
+    const destination = authInfo?.destination || query?.destination || '/';
+    const seperator = destination.includes('?') ? '&' : '?';
+    res.redirect(`${destination}${seperator}trace=${req.traceId}`);
 }
 
 /**

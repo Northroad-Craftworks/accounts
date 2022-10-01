@@ -3,6 +3,7 @@ import express from 'express';
 import createError from 'http-errors';
 import logger from './lib/logger.js';
 import helmetMiddleware from './middleware/helmet.js';
+import traceIdMiddleware from './middleware/trace-id.js';
 import sessionMiddleware from './middleware/session.js';
 import authenticationMiddleware from './middleware/authentication.js';
 import swaggerUiMiddleware from './middleware/swagger-ui.js';
@@ -18,7 +19,10 @@ export default app;
 app.use(helmetMiddleware);
 
 // Serve static assets.
-app.use('/', express.static(new URL('static', import.meta.url).pathname));
+app.use('/', express.static(new URL('static', import.meta.url).pathname, { index: false }));
+
+// Attach traceIds to all requests.
+app.use(traceIdMiddleware);
 
 // Log requests
 app.use(loggerMiddleware);
@@ -26,6 +30,12 @@ app.use(loggerMiddleware);
 // Authenticate all other requests.
 app.use(sessionMiddleware);
 app.use(authenticationMiddleware);
+
+// Serve the basic homepages.
+app.get('/', (req, res) => {
+    if (req.user) res.sendFile(new URL('static/logged-in.html', import.meta.url).pathname)
+    else res.sendFile(new URL('static/logged-out.html', import.meta.url).pathname)
+})
 
 // Serve the swaggerUI middleware.
 app.use(swaggerUiMiddleware);
