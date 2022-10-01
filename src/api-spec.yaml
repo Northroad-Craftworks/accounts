@@ -49,6 +49,9 @@ paths:
                    $ref: "#/components/schemas/Session"
                   accessToken:
                    $ref: "#/components/schemas/AccessToken"
+            text/html:
+              schema:
+                description: A basic webpage of your profile.
                     
 
 components:
