@@ -1,0 +1,6 @@
+- name: inventory
+  description: Full access to the entire inventory system.
+- name: inventory:ledger
+  description:  Read-write access to the inventory ledger.
+- name: inventory:ledger:read
+  description:  Read access to the inventory ledger.
