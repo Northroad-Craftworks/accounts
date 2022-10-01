@@ -1,7 +1,9 @@
 import apiSpec from "../lib/api-spec.js";
 import { v4 as uuid } from "uuid";
 import Database, { DesignDoc } from "../lib/database.js";
-import Role, { ROLES } from './Role.js';
+import Role from "./Role.js";
+
+export const PREFIX = 'user:';
 
 // Create and use a new database instance.
 export const database = new Database();
@@ -26,15 +28,21 @@ const userViews = new DesignDoc(database, 'user-views:v1', {
     views: {
         byEmail: {
             map: function (doc) {
+                // Note: We can't use `PREFIX` here, because this runs in CouchDB.
                 if (!doc._id.startsWith('user:')) return;
                 emit(doc.email, doc.name);
-                for (const email of doc.loginEmails) emit(email, doc.name);
+                for (const email of doc.loginEmails || []) emit(email, doc.name);
             }
         }
     }
 });
 
 export default class User {
+    static async get(id){
+        const document = await database.get(PREFIX + id);
+        return new User(document);
+    }
+
     static async findByEmail(email) {
         const result = await database.view(userViews, 'byEmail', { key: email, include_docs: true });
         const document = result?.rows?.[0]?.doc;
@@ -48,26 +56,30 @@ export default class User {
         const existing = await User.findByEmail(email);
         if (existing) return existing;
 
-        // Otherwise, create a new one, _without_ saving it.
-        return new User({
+        // Otherwise, create a new one and save it.
+        const user = new User({
             _id: `user:${uuid()}`,
             name: profile.displayName,
             email,
             profilePhoto: profile.photos?.[0]?.value,
-            roles: [ROLES.VISITOR]
+            roles: ['user']
         });
+        await user.save();
+        return user;
     }
 
     constructor(document) {
-        if (!document?._id?.startsWith('user:')) throw new Error('Invalid user id.');
         this._document = document;
-        this._loginEmails = new Set(document?.loginEmails);
-        this._roles = new Set(document?.roles);
-        this._permissions = new Set(document?.permissions);
+        if (!this.id) throw new Error('Invalid user id.');
+    }
+
+    get isAdmin(){
+        // TODO Make an admins list.
+        return false;
     }
 
     get id() {
-        return this._document._id.match(`^${'user:'}(?<id>.+)$`)?.groups?.id;
+        return this._document._id.match(`^${PREFIX}(?<id>.+)$`)?.groups?.id;
     }
 
     get name() {
@@ -87,11 +99,29 @@ export default class User {
     }
 
     get roles() {
-        return [...this._roles];
+        return this._document.roles || [];
     }
 
     get permissions() {
-        return [...this._permissions];
+        return this._document.permissions || []
+    }
+
+    get effectivePermissions(){
+        return new Set([
+            ...this.roles(name => Role.get(name).effectivePermissions).flat(),
+            ...this.permissions
+        ]);
+    }
+
+    hasPermission(name){
+        if (this.isAdmin) return true;
+        if (this.permissions)
+        for (const role of this.roles){
+            if (role.hasPermission(name)) return true;
+        }
+    }
+
+    async cache(){
     }
 
     async save() {
@@ -100,6 +130,10 @@ export default class User {
 
     async destroy() {
         await database.destroy(this._document);
+    }
+
+    serialize() {
+        return {...this._document};
     }
 
     toString() {

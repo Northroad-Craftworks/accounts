@@ -13,14 +13,12 @@ const strategies = [];
 
 // Support sessions.
 passport.serializeUser((user, done) => {
-    // TODO Store a session object, instead of the user document.
-    done(null, user._document);
+    done(null, user.id);
 });
-passport.deserializeUser((document, done) => {
-    // TODO Deserialize a session instance.
-    // if (!strategies.includes(user.provider)) done(null, false);
-    // else
-    done(null, new User(document));
+passport.deserializeUser((id, done) => {
+    User.get(id)
+        .then(user => done(null, user))
+        .catch(error => done(error));
 });
 router.use(passport.session());
 router.use((req, res, next) => {
@@ -49,6 +47,10 @@ if (GOOGLE_CLIENT_ID) {
         });
     router.get('/oauth2/redirect/google',
         passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }),
+        (req, res, next) => {
+            req.session.provider = 'google';
+            next();
+        },
         redirectToDestination);
     strategies.push('google');
 }
@@ -82,8 +84,8 @@ router.get('/login', (req, res) => {
         const messages = (req.session?.messages || [])
             .map(message => `<p>${message}</p>`)
             .join('\n');
-        delete req.session?.messages
-        
+        delete req.session?.messages;
+
         const links = strategies
             .map(strategy => `<li><a href='/login/${strategy}'>${strategy}</a></li>`)
             .join('\n');
@@ -98,6 +100,11 @@ router.use('/logout',
         req.logout(next);
     },
     (req, res) => res.redirect(`/?trace=${req.traceId}`));
+
+// Any errors in the authentication middleware should cause the session to terminate.
+router.use((error, req, res, next) => {
+    req.session.destroy(_ => next(error));
+});
 
 /**
  * Helper function to redirect to the user's destination after login.

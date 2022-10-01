@@ -11,5 +11,12 @@ export async function whoami(req, res, next) {
             res.send(`${name}\n${email}\n${photo}`);
         }
     }
-    else res.json({ user, accessToken });
+    else res.json({
+        user,
+        accessToken,
+        session: {
+            id: req.session.id.split(':')[1],
+            provider: req.session.provider
+        }
+    });
 }

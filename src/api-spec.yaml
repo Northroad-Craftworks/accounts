@@ -150,7 +150,7 @@ components:
         name:
           type: string
           description: The name of the role.
-          pattern: "^[a-z]+"
+          pattern: "^[a-z](?:[a-z-]*[a-z])?$"
           example: admin
         description:
           type: string
@@ -175,7 +175,7 @@ components:
         name:
           type: string
           description: The name of the permission.
-          pattern: "^[a-z-]+(?::[a-z-]+)*$"
+          pattern: "^[a-z](?:[a-z-]*[a-z])?(?::[a-z](?:[a-z-]*[a-z])?)*$"
           example: inventory:ledger:read
         description:
           type: string
@@ -189,10 +189,6 @@ components:
         id:
           type: string
           description: Random ID for the session
-          format: uuid
-        userId:
-          type: string
-          description: The ID of the user
           format: uuid
         provider:
           type: string

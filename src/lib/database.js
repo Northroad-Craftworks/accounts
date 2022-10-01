@@ -1,6 +1,12 @@
 import Nano from 'nano';
 import pluralize from 'pluralize';
 import logger from './logger.js';
+import redis from './redis.js';
+
+const cacheDuration = Number(process.env.CACHE_DURATION) || 600;
+
+export let cacheHits = 0;
+export let cacheMisses = 0;
 
 /**
  * A map of nano instances by URL, for re-use.
@@ -25,7 +31,7 @@ class DatabaseError extends Error {
         if (allowedStatuses.includes(baseError.statusCode)) this.statusCode = baseError.statusCode;
     }
 }
-function handleError(error) {
+function convertError(error) {
     throw new DatabaseError(error);
 }
 
@@ -68,7 +74,7 @@ export default class Database {
      * @returns {Promise<object[]>}
      */
     async list(options) {
-        return database.list(options).catch(handleError);
+        return database.list(options).catch(convertError);
     }
 
     /**
@@ -76,8 +82,36 @@ export default class Database {
      * @param {string} docId - Document ID to fetch
      * @returns {Promise<object>}
      */
-    async get(docId) {
-        return await this.database.get(docId).catch(handleError);
+    async get(docId, options) {
+        const useCache = options?.cache !== false;
+        let document;
+
+        // Check the high-speed redis cache first.
+        if (useCache) document = await redis.get(docId)
+            .then(cached => {
+                if (cached) {
+                    cacheHits++;
+                    return JSON.parse(cached);
+                }
+                logger.debug(`Cache miss for ${docId}`);
+                cacheMisses++;
+            })
+            .catch(async error => {
+                logger.error(`Cache error:`, error);
+                await redis.del(docId)
+                    .catch(error => logger.error("Failed to delete broken cache:", error));
+                return null;
+            });
+
+        // If we haven't loaded the document from cache, check couch.
+        if (!document) {
+            // If it's not there, check couch and update the cache.
+            document = await this.database.get(docId).catch(convertError);
+            if (useCache) await redis.set(docId, JSON.stringify(document));
+        }
+        // Set or refresh the cache TTL.
+        if (useCache) await redis.expire(docId, cacheDuration);
+        return document;
     }
 
     /**
@@ -87,19 +121,21 @@ export default class Database {
      * @param {string} [document._rev] - Document Revision
      * @returns {Promise<string>} New revision of the saved document
      */
-    async insert(document) {
+    async insert(document, options) {
         if (!document?._id) throw new DatabaseError('Missing `_id` for document');
-        const { rev } = await this.database.insert(document).catch(handleError);
+        const { rev } = await this.database.insert(document).catch(convertError);
         document._rev = rev;
+        if (options?.cache !== false) await redis.set(document._id, JSON.stringify(document));
         return rev;
     }
 
-    async destroy(document) {
+    async destroy(document, options) {
         if (!document?._id) throw new DatabaseError('Missing `_id` for document');
         if (!document?._rev) throw new DatabaseError('Missing `_rev` for document');
         const response = await this.database.destroy(document._id, document._rev);
         // TODO Validate the response.
         delete document._rev;
+        if (options?.cache !== false) await redis.del(document._id);
     }
 
     /**
@@ -120,7 +156,7 @@ export default class Database {
         await designDoc.ready;
 
         // Fetch the view.
-        return this.database.view(designDoc.name, view, options).catch(handleError);
+        return this.database.view(designDoc.name, view, options).catch(convertError);
     }
 
     async find(options) {
@@ -192,11 +228,12 @@ export class DesignDoc {
      */
     async assert() {
         logger.debug(`Asserting design document: ${this.name}`);
-        const existingDoc = await this.database.get(this.document._id).catch(error => {
-            // Ignore 404s, since we'll create the document.
-            if (error.statusCode === 404) return;
-            throw new DatabaseError(error);
-        });
+        const existingDoc = await this.database.get(this.document._id, { cache: false })
+            .catch(error => {
+                // Ignore 404s, since we'll create the document.
+                if (error.statusCode === 404) return;
+                throw new DatabaseError(error);
+            });
 
         // Compare the existing document to the desired one.
         if (existingDoc) {
@@ -212,7 +249,7 @@ export class DesignDoc {
 
         // Publish a new or updated version.
         this.document._rev = existingDoc?._rev;
-        await this.database.insert(this.document)
+        await this.database.insert(this.document, { cache: false })
             .then(revision => logger.info(`Updated design document ${this.name}@${revision}`))
             .catch(error => {
                 if (error.statusCode !== 409) throw error;
