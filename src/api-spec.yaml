@@ -7,6 +7,10 @@ info:
 tags:
   - name: Service
     description: Information about the service's status
+  - name: My Account
+    description: Manage your own account, access keys, and sessions
+  - name: Admin
+    description: Administrative tasks
 
 paths:
   /status:
@@ -26,6 +30,26 @@ paths:
                     type: string
                     description: Current release version
                     example: 1.0.0
+  /whoami:
+    get:
+      operationId: whoami
+      summary: Get information about your current authentication.
+      tags: [My Account]
+      responses:
+        "200":
+          description: Your current logged-in user and session.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                   $ref: "#/components/schemas/User"
+                  session:
+                   $ref: "#/components/schemas/Session"
+                  accessToken:
+                   $ref: "#/components/schemas/AccessToken"
+                    
 
 components:
   responses:
@@ -42,7 +66,7 @@ components:
     User:
       type: object
       description: A record of a specific individual's account.
-      required: [id, name, emails, roles, permissions]
+      required: [id, name, email, roles, permissions]
       properties:
         id:
           type: string
@@ -52,9 +76,13 @@ components:
           type: string
           description: Preferred name of the user.
           example: 'James Tanner-McLeod'
-        emails:
+        email:
+          type: string
+          description: The primary email address of the user.
+          format: email
+        loginEmails:
           type: array
-          description: List of emails associated with the user.
+          description: Other emails that the user can login with.
           items:
             type: string
             description: A valid email address associated with the user.
@@ -76,6 +104,12 @@ components:
       type: object
       description: A credential that a user can use to authenticate programatically.
       properties:
+        secret:
+          type: string
+          description: |
+            The secret key value which can be used for authentication.
+            Only returned when the key is first generated.
+          pattern: "^NRCW:[a-z]{32}$"
         id:
           type: string
           description: A randomly-generated UID to identify the access token.

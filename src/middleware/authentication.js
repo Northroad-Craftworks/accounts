@@ -3,6 +3,7 @@ import createError from 'http-errors';
 import passport from 'passport';
 import GoogleStrategy from 'passport-google-oauth20';
 import logger from '../lib/logger.js';
+import User from '../models/User.js';
 
 const router = new Router();
 export default router;
@@ -12,17 +13,20 @@ const strategies = [];
 
 // Support sessions.
 passport.serializeUser((user, done) => {
-    done(null, user);
+    // TODO Store a session object, instead of the user document.
+    done(null, user._document);
 });
-passport.deserializeUser((user, done) => {
-    if (!strategies.includes(user.provider)) done(null, false);
-    else done(null, user);
+passport.deserializeUser((document, done) => {
+    // TODO Deserialize a session instance.
+    // if (!strategies.includes(user.provider)) done(null, false);
+    // else
+    done(null, new User(document));
 });
 router.use(passport.session());
 router.use((req, res, next) => {
-    if (!req.session) throw createError(503, "Failed to fetch session", {expose: true});
+    if (!req.session) throw createError(503, "Failed to fetch session", { expose: true });
     else next();
-})
+});
 
 // Configure the Google strategy
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
@@ -98,18 +102,8 @@ function redirectToDestination(req, res) {
  * @param {function} done 
  */
 function verifyOauthProfile(accessToken, refreshToken, profile, done) {
-    console.log(profile);
-    // TODO Connect to a user database.
-    const provider = profile.provider?.toLowerCase();
-    if (!strategies.includes(provider)) throw new Error(`OAuth provider '${provider}' doesn't match strategy`);
-    const email = profile.emails?.[0]?.value;
-    const name = profile.displayName;
-    const user = {
-        id: name || email || `${provider}:${profile.id}`,
-        provider,
-        email,
-        name,
-        profilePhoto: profile.photos?.[0]?.value
-    };
-    done(null, user);
+    // TODO create a session for the user.
+    User.oauthLogin(profile)
+        .then(user => done(null, user))
+        .catch(error => done(error));
 };
