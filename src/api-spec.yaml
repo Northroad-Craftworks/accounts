@@ -1,0 +1,170 @@
+openapi: "3.0.0"
+
+info:
+  title: Northroad Craftworks Accounts
+  version: Development
+
+tags:
+  - name: Service
+    description: Information about the service's status
+
+paths:
+  /status:
+    get:
+      operationId: getStatus
+      summary: Get the service status
+      tags: [Service]
+      responses:
+        "200":
+          description: General information about the health and status of the service.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    description: Current release version
+                    example: 1.0.0
+
+components:
+  responses:
+    Error:
+      description: Something went wrong
+      content:
+        'text/plain':
+          schema:
+            type: string
+            description: A description of the problem
+            example: 'Internal server error'
+  
+  schemas:
+    User:
+      type: object
+      description: A record of a specific individual's account.
+      required: [id, name, emails, roles, permissions]
+      properties:
+        id:
+          type: string
+          description: A randomly-generated UID to identify the user.
+          format: uuid
+        name:
+          type: string
+          description: Preferred name of the user.
+          example: 'James Tanner-McLeod'
+        emails:
+          type: array
+          description: List of emails associated with the user.
+          items:
+            type: string
+            description: A valid email address associated with the user.
+            format: email
+        profilePhoto:
+          type: string
+          description: The web address of the user's profile photo.
+          format: url
+        roles:
+          type: array
+          description: A list of all the roles assigned to the user.
+        permissions:
+          type: array
+          description: A list of all the permissions granted to a user, in addition to their roles.
+          items:
+            $ref: "#/components/schemas/Permission/properties/name"
+    
+    AccessToken:
+      type: object
+      description: A credential that a user can use to authenticate programatically.
+      properties:
+        id:
+          type: string
+          description: A randomly-generated UID to identify the access token.
+          format: uuid
+        name:
+          type: string
+          description: A friendly name used by the user to describe the token.
+          example: Local testing
+        userId:
+          type: string
+          description: The ID of the user
+          format: uuid
+        created:
+          type: string
+          description: The date when the access token was created.
+          format: date-time
+        expires:
+          type: string
+          description: The date when the access token is no longer valid.
+          format: date-time
+        valid:
+          type: boolean
+          description: Whether the access token is still valid.
+        scopes:
+          type: array
+          description: A list of permissions the access token is allowed to use.
+          items:
+            $ref: "#/components/schemas/Permission"
+
+    Role:
+      type: object
+      description: A role is a collection of permissions which can be granted to a user as a group.
+      required: [name, permissions]
+      properties:
+        name:
+          type: string
+          description: The name of the role.
+          pattern: "^[a-z]+"
+          example: admin
+        description:
+          type: string
+          description: A friendly description of what the role does.
+          example: Unrestricted administrative access to all services.
+        permissions:
+          type: array
+          description: A list of all permissions granted by the role.
+          items:
+            $ref: "#/components/schemas/Permission/properties/name"
+
+    Permission:
+      type: object
+      description: |
+        A permission allows a user to perform some set of tasks.
+        Permissions are nested and the name of each permission is prefixed with the name of the permission above it.
+        In practice, permissions are usually grouped as `<service>:<resource-type>:<action>`. For example:
+        - `inventory` might grant full access to the entire inventory system
+        - `inventory:ledger` might grant read/write access to the inventory ledger
+        - `inventory:ledger:read` might grant read-only access to the inventory ledger.
+      properties:
+        name:
+          type: string
+          description: The name of the permission.
+          pattern: "^[a-z-]+(?::[a-z-]+)*$"
+          example: inventory:ledger:read
+        description:
+          type: string
+          description: A friendly description of what the permission does.
+          example: Read the transaction ledger in the Inventory service.
+
+    Session:
+      type: object
+      description: A logged-in session for a user.
+      properties:
+        id:
+          type: string
+          description: Random ID for the session
+          format: uuid
+        userId:
+          type: string
+          description: The ID of the user
+          format: uuid
+        provider:
+          type: string
+          description: The name of the provider who authenticated this session
+          enum:
+          - google
+          - anonymous
+          
+        
+
+        
+
