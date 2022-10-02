@@ -20,7 +20,7 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "files": [
-    "/src/exports",
+    "/src/export.js",
     "/src/lib",
     "/src/models",
     "/src/api-spec.yaml",
