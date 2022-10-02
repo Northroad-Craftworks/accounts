@@ -1,5 +1,5 @@
-import defaultLogger from '../lib/logger.js';
 import { Router } from 'express';
+import defaultLogger from './lib/logger.js';
 
 export default function createAccountsMiddleware(options) {
     const logger = options?.logger || defaultLogger;
