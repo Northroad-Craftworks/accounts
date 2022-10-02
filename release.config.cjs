@@ -1,7 +1,14 @@
 const COMMIT_ANALYZER = [
     '@semantic-release/commit-analyzer',
     {
-        preset: 'eslint'
+        preset: 'eslint',
+        releaseRules: [
+            { tag: 'Breaking', release: 'major' },
+            { tag: 'New', release: 'minor' },
+            { tag: 'Update', release: 'minor' },
+            { tag: 'Fix', release: 'patch' },
+            { tag: 'Upgrade', release: 'patch' }
+        ]
     }
 ];
 
@@ -20,7 +27,7 @@ const DOCKER = [
     '@codedependant/semantic-release-docker',
     {
         dockerTags: ['latest', '{{version}}'],
-        dockerRegistry: 'ghcr.io',
+        dockerRegistry: process.env.REGISTRY,
         dockerLogin: false
     }
 ]
