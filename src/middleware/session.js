@@ -14,7 +14,9 @@ const store =  new RedisStore({
 
 export default session({
     secret,
-    // TOOD Configure cookie
+    cookie: {
+        domain: '.northroad-craftworks.com'
+    },
     name: 'NRCW',
     saveUninitialized: false,
     resave: false,

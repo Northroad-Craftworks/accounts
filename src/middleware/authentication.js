@@ -57,14 +57,6 @@ if (GOOGLE_CLIENT_ID) {
 
 // TODO Configure a local strategy
 
-// Configure an anonymous strategy
-if (process.env.ALLOW_ANONYMOUS === 'true') {
-    router.get('/login/anonymous',
-        (req, res, next) => req.login({ id: 'Anonymous', provider: 'anonymous' }, next),
-        redirectToDestination);
-    strategies.push('anonymous');
-}
-
 
 if (strategies.length) logger.verbose(`Configured authentication strategies: ${strategies.join(', ')}`);
 else logger.warn('No authentication strategies are configured!');
@@ -76,8 +68,10 @@ router.get('/login/:strategy', req => {
 
 // Attach the login and logout handlers.
 router.get('/login', (req, res) => {
+    const destination = encodeURI(req.query.destination || '/');
     if (!req.session?.messages && strategies.length === 1) {
-        res.redirect(`/login/${strategies[0].toLowerCase()}?trace=${req.traceId}`);
+        const strategy = strategies[0].toLowerCase()
+        res.redirect(`/login/${strategy}?destination=${destination}&trace=${req.traceId}`);
     }
     else if (strategies.length) {
         // TODO Replace placeholder login page with a proper one.
@@ -87,7 +81,7 @@ router.get('/login', (req, res) => {
         delete req.session?.messages;
 
         const links = strategies
-            .map(strategy => `<li><a href='/login/${strategy}'>${strategy}</a></li>`)
+            .map(strategy => `<li><a href='/login/${strategy}/destination=${destination}'>${strategy}</a></li>`)
             .join('\n');
         res.type('html').send(`<h1>Login</h2>\n${messages}\n<ul>\n${links}\n</ul>`);
     }
@@ -106,6 +100,17 @@ router.use((error, req, res, next) => {
     req.session.destroy(_ => next(error));
 });
 
+router.get('/auth', (req, res, next) => {
+    const destination = encodeURI(req.query.destination || '/');
+    if (!req.user){
+        res.redirect(`/login/?destination=${destination}&trace=${req.traceId}`);
+    }
+    else {
+        // TODO Provide a short-lived token for the service to exchange for a session.
+        res.redirect(destination);
+    }
+})
+
 /**
  * Helper function to redirect to the user's destination after login.
  */
@@ -113,7 +118,7 @@ function redirectToDestination(req, res) {
     // TODO Load the intended destination.
     const { authInfo, query } = req;
     if (authInfo?.state?.trace) req.setTraceId(authInfo.state.trace);
-    const destination = authInfo?.destination || query?.destination || '/';
+    const destination = authInfo?.state?.destination || query?.destination || '/';
     const seperator = destination.includes('?') ? '&' : '?';
     res.redirect(`${destination}${seperator}trace=${req.traceId}`);
 }
