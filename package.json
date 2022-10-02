@@ -4,6 +4,7 @@
   "description": "User authentication and authorization",
   "main": "src/app.js",
   "exports": {
+    ".": "./src/exports/index.js",
     "./*": "./src/exports/*.js"
   },
   "type": "module",
