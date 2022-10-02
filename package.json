@@ -1,9 +1,11 @@
 {
   "name": "@northroad-craftworks/accounts",
-  "private": true,
   "version": "0.0.0-unreleased.0",
   "description": "User authentication and authorization",
   "main": "src/app.js",
+  "exports": {
+    ".": "./src/export.js"
+  },
   "type": "module",
   "scripts": {
     "start": "node .",
@@ -14,6 +16,16 @@
     "type": "git",
     "url": "https://github.com/Northroad-Craftworks/accounts.git"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "files": [
+    "/src/export.js",
+    "/src/lib",
+    "/src/models",
+    "/src/api-spec.yaml",
+    "/src/permissions.yaml"
+  ],
   "contributors": [
     "James Tanner <james@northroad-craftworks.com>"
   ],
