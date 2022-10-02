@@ -20,7 +20,7 @@ const DOCKER = [
     '@codedependant/semantic-release-docker',
     {
         dockerTags: ['latest', '{{version}}'],
-        dockerRegistry: process.env.REGISTRY,
+        dockerRegistry: 'ghcr.io',
         dockerLogin: false
     }
 ]
